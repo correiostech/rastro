@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 )
 
 type rastro struct {
@@ -58,12 +60,15 @@ type Resultado struct {
 	} `json:"objetos"`
 }
 
-func (c *rastro) Rastreia(o string, token string) (Resultado, error) {
+func (c *rastro) Rastreia(objetos string, token string) (Resultado, error) {
 	var result Resultado
-	res, err := c.doReq("GET", c.base+o+"?resultado=U", token)
-
-
-
+	params := url.Values{}
+	params.Add("resultado", "U")
+	codigosObjetos := strings.Split(objetos, ",")
+	for _, codigo := range codigosObjetos {
+		params.Add("codigosObjetos", codigo)
+	}
+	res, err := c.doReq("GET", c.base+"?"+params.Encode(), token)
 	if err != nil {
 		return result, fmt.Errorf("rastro-rs objetos: %v", err)
 	}
