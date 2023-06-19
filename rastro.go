@@ -5,10 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 )
+
+var padrao = `^[A-Za-z]{2}\d{9}[A-Za-z]{2}$`
 
 type rastro struct {
 	client *http.Client
@@ -74,10 +78,10 @@ type ResultadoAsync struct {
 	Idioma     string `json:"idioma"`
 }
 
-func (c *rastro) Rastreia(objetos string, token string) (Resultado, error) {
+func (c *rastro) Rastreia(objetos string, token string, resultados byte) (Resultado, error) {
 	var result Resultado
 	params := url.Values{}
-	params.Add("resultado", "U")
+	params.Add("resultado", string(resultados))
 	codigosObjetos := strings.Split(objetos, ",")
 	for _, codigo := range codigosObjetos {
 		params.Add("codigosObjetos", codigo)
@@ -131,4 +135,40 @@ func (c *rastro) Recibo(recibo string, token string) (Resultado, error) {
 		return result, fmt.Errorf("rastro-rs rastros: %v", err)
 	}
 	return result, nil
+}
+
+// le um arquivo de objetos, cada objeto deve estar em uma linha
+func LeArquivo(arquivo string) ([][]string, error) {
+	objetos := make([][]string, 0)
+	dados, err := ioutil.ReadFile(arquivo)
+	if err != nil {
+		return nil, err
+	}
+	conteudo := string(dados)
+	linhas := strings.Split(conteudo, "\n")
+	for i := 0; i < len(linhas); i += 1000 {
+		fim := i + 1000
+		if fim > len(linhas) {
+			fim = len(linhas)
+		}
+		// Validação dos objetos
+		if err := validaPadrao(linhas[i:fim]); err != nil {
+			return nil, err
+		}
+		objetos = append(objetos, linhas[i:fim])
+	}
+	return objetos, nil
+}
+
+func validaPadrao(objetos []string) error {
+	for _, o := range objetos {
+		regexpPadrao, err := regexp.Compile(padrao)
+		if err != nil {
+			return err
+		}
+		if !regexpPadrao.MatchString(o) {
+			return fmt.Errorf("%s: objeto fora do padrão", o)
+		}
+	}
+	return nil
 }
